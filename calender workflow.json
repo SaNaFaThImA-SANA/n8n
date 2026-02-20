@@ -1,0 +1,197 @@
+{
+  "name": "calendar workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "telegram-trigger",
+      "name": "Telegram Trigger"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "{{ $json.message.text }}",
+        "options": {
+          "systemMessage": "You are an email and reminder scheduling agent.\n\nYou have three tools available:\n- GMAIL_GET_EMAILS\n- GMAIL_SEND_EMAIL\n- CALENDAR_CREATE_REMINDER\n\nYou MUST choose the correct tool based on user intent.\n\nINTENT RULES:\n\n1) If the message asks to read, check, fetch, or get emails:\n→ Use GMAIL_GET_EMAILS only.\n\n2) If the message asks to send an email and contains an email address:\n→ Use GMAIL_SEND_EMAIL only.\n\n3) If the message contains a date or date with time\n(for example: \"23 june 2026\", \"june 23\", \"june23 12am\"):\n→ ALWAYS use CALENDAR_CREATE_REMINDER only.\n\nThis is true even if the message does not explicitly say \"set reminder\".\n\nCALENDAR RULES:\n- Create exactly ONE event\n- Use the extracted date\n- Use the extracted time if present\n- If no time is present, use 9:00 AM to 10:00 AM local time\n- Add exactly one alarm-style reminder on that same date\n\nEXECUTION RULES:\n- Use only ONE tool per request unless explicitly asked otherwise\n- Do NOT fallback to Gmail when a date is detected\n- Do NOT explain your actions\n- Do NOT ask questions"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        304,
+        0
+      ],
+      "id": "ai-agent",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        48,
+        272
+      ],
+      "id": "openai-chat-model",
+      "name": "OpenAI Chat Model"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "={{ $json.output }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        656,
+        0
+      ],
+      "id": "telegram-send-message",
+      "name": "Send a text message"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "limit": "={{ $fromAI('Limit', '', 'number') }}",
+        "filters": {}
+      },
+      "type": "n8n-nodes-base.gmailTool",
+      "typeVersion": 2.2,
+      "position": [
+        384,
+        288
+      ],
+      "id": "gmail-get-emails",
+      "name": "GMAIL_GET_EMAILS"
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "mode": "list"
+        },
+        "useDefaultReminders": "={{ $fromAI('Use_Default_Reminders', '', 'boolean') }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        512,
+        256
+      ],
+      "id": "calendar-create-reminder",
+      "name": "CALENDAR_CREATE_REMINDER"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $fromAI('To', '', 'string') }}",
+        "subject": "={{ $fromAI('Subject', '', 'string') }}",
+        "message": "={{ $fromAI('Message', '', 'string') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmailTool",
+      "typeVersion": 2.2,
+      "position": [
+        704,
+        272
+      ],
+      "id": "gmail-send-email",
+      "name": "GMAIL_SEND_EMAIL"
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GMAIL_GET_EMAILS": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CALENDAR_CREATE_REMINDER": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GMAIL_SEND_EMAIL": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "tags": []
+}
